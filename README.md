@@ -64,7 +64,7 @@
 ### Building the Project
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/meshline-android.git
+   git clone https://github.com/ZaheerAbbasOrakzai/meshline-android.git
    cd meshline-android
    ```
 2. Open the project in Android Studio.
