@@ -1,0 +1,6 @@
+{
+  "name": "Meshline",
+  "description": "Offline-first end-to-end encrypted Bluetooth mesh network messenger.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
