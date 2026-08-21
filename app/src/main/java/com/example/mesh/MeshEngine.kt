@@ -56,6 +56,7 @@ class MeshEngine(private val context: Context) {
 
     private var meshService: MeshService? = null
     private var onPacketReceivedCallback: ((MeshPacket) -> Unit)? = null
+    private var onBluetoothRequiredCallback: (() -> Unit)? = null
     private var localNodeId: String = "unassigned"
 
     fun setService(service: MeshService) {
@@ -68,6 +69,14 @@ class MeshEngine(private val context: Context) {
 
     fun setOnPacketReceivedCallback(callback: (MeshPacket) -> Unit) {
         this.onPacketReceivedCallback = callback
+    }
+
+    fun setOnBluetoothRequiredCallback(callback: () -> Unit) {
+        this.onBluetoothRequiredCallback = callback
+    }
+
+    fun onBluetoothRequired() {
+        onBluetoothRequiredCallback?.invoke()
     }
 
     fun onNeighborConnected(address: String) {

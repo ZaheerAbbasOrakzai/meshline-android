@@ -59,6 +59,11 @@ class MeshService : Service() {
 
     @SuppressLint("MissingPermission")
     fun startMesh() {
+        if (bluetoothAdapter?.isEnabled == false) {
+            // In a real service, we can't show UI, so we notify the engine/activity
+            meshEngine?.onBluetoothRequired()
+            return
+        }
         startAdvertising()
         startGattServer()
         startDiscovery()

@@ -280,6 +280,11 @@ class MeshRepository(
         contactDao.getContactById(contactId)?.let { contactDao.updateContact(it.copy(verified = isVerified)) }
     }
 
+    suspend fun updateProfile(username: String, avatar: String) {
+        val current = identityDao.getIdentity() ?: return
+        identityDao.insertIdentity(current.copy(username = username, avatar = avatar))
+    }
+
     suspend fun sendJoinRequest(peerName: String, peerNodeId: String, peerPublicKey: String) {
         val request = JoinRequestEntity(id = UUID.randomUUID().toString(), peerName = peerName, nodeId = peerNodeId, publicKey = peerPublicKey, status = "PENDING", direction = "OUTBOUND")
         joinRequestDao.insertRequest(request)
@@ -297,14 +302,6 @@ class MeshRepository(
 
     suspend fun rejectJoinRequest(requestId: String) {
         joinRequestDao.getRequestById(requestId)?.let { joinRequestDao.updateRequest(it.copy(status = "REJECTED")) }
-    }
-
-    suspend fun triggerSimulatedPeerBeacon(name: String? = null, id: String? = null) {
-        val peerName = name ?: listOf("Elena Rostova", "Marcus Relay", "Dr. Thorne").random()
-        val nodeId = id ?: "node_${(1000..9999).random()}"
-        val request = JoinRequestEntity(id = UUID.randomUUID().toString(), peerName = peerName, nodeId = nodeId, publicKey = UUID.randomUUID().toString(), status = "PENDING", direction = "INBOUND")
-        joinRequestDao.insertRequest(request)
-        meshEngine.addDiscoveredNode(MeshPeer("disc_$nodeId", peerName, nodeId, -60, 1, PeerState.DISCOVERING, peerName.contains("Relay")))
     }
 
     suspend fun panicWipeData() {

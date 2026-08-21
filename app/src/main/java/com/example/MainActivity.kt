@@ -1,6 +1,7 @@
 package com.example
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -12,13 +13,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Hub
@@ -27,9 +26,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,6 +46,7 @@ class MainActivity : ComponentActivity() {
             MeshlineTheme {
                 val viewModel: MainViewModel = viewModel()
                 val context = LocalContext.current
+                val bluetoothEnableRequest by viewModel.requestBluetoothEnable.collectAsStateWithLifecycle()
 
                 val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     arrayOf(
@@ -63,19 +61,30 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
+                val btLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { _: ActivityResult ->
+                    viewModel.bluetoothEnableHandled()
+                }
 
                 LaunchedEffect(Unit) { launcher.launch(permissions) }
+                
+                LaunchedEffect(bluetoothEnableRequest) {
+                    if (bluetoothEnableRequest) {
+                        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                        btLauncher.launch(enableBtIntent)
+                    }
+                }
 
                 DisposableEffect(Unit) {
-                    val intent = Intent(context, MeshService::class.java)
                     val connection = object : ServiceConnection {
                         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                            (service as? MeshService.MeshBinder)?.getService()?.let { 
-                                viewModel.setMeshService(it) 
+                            val binder = service as? MeshService.MeshBinder
+                            binder?.getService()?.let { s: MeshService -> 
+                                viewModel.setMeshService(s) 
                             }
                         }
                         override fun onServiceDisconnected(name: ComponentName?) {}
                     }
+                    val intent = Intent(context, MeshService::class.java)
                     context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
                     onDispose { context.unbindService(connection) }
                 }
@@ -156,19 +165,20 @@ fun MeshlineApp(viewModel: MainViewModel) {
                         ChatsListScreen(contacts, selectedId, { viewModel.selectConversation(it) }, { viewModel.setActiveTab(MainTab.NETWORK); viewModel.startBleScan() }, { showCreateGrp = true })
                     }
                 }
-                MainTab.NETWORK -> NetworkDashboardScreen(peers, routes, logs, pendingJoinRequests, isScanning, isRelay, { viewModel.startBleScan() }, { viewModel.toggleRelayMode() }, { viewModel.toggleJoinRequestsDialog() }, { viewModel.togglePairNewNodeDialog() }, { viewModel.triggerSimulatedBeacon() })
+                MainTab.NETWORK -> NetworkDashboardScreen(peers, routes, logs, pendingJoinRequests, isScanning, isRelay, { viewModel.startBleScan() }, { viewModel.toggleRelayMode() }, { viewModel.toggleJoinRequestsDialog() }, { viewModel.togglePairNewNodeDialog() })
                 MainTab.CONTACTS -> ContactsScreen(contacts, pendingJoinRequests.size, { viewModel.toggleContactVerification(it) }, { viewModel.togglePairNewNodeDialog() }, { viewModel.toggleJoinRequestsDialog() }, { viewModel.selectConversation(it); viewModel.setActiveTab(MainTab.CHATS) })
                 MainTab.SETTINGS -> SettingsScreen(
                     identity, showPanic, 
                     { viewModel.togglePanicDialog() }, 
                     { viewModel.confirmPanicWipe() },
                     { viewModel.getIdentityExportString() },
-                    { viewModel.importIdentity(it) }
+                    { viewModel.importIdentity(it) },
+                    { u, a -> viewModel.updateProfile(u, a) }
                 )
             }
 
-            if (showJoinReqs) JoinRequestsDialog(pendingJoinRequests, { viewModel.toggleJoinRequestsDialog() }, { viewModel.acceptJoinRequest(it) }, { viewModel.rejectJoinRequest(it) }, { viewModel.triggerSimulatedBeacon() })
-            if (showPair) PairNewNodeDialog(identity, discoveredNodes, { viewModel.togglePairNewNodeDialog() }, { n, i, k -> viewModel.sendJoinRequest(n, i, k) }, { viewModel.triggerSimulatedBeacon() })
+            if (showJoinReqs) JoinRequestsDialog(pendingJoinRequests, { viewModel.toggleJoinRequestsDialog() }, { viewModel.acceptJoinRequest(it) }, { viewModel.rejectJoinRequest(it) })
+            if (showPair) PairNewNodeDialog(identity, discoveredNodes, { viewModel.togglePairNewNodeDialog() }, { n, i, k -> viewModel.sendJoinRequest(n, i, k) })
             if (showWT && selectedContact != null) WalkieTalkieDialog(selectedContact, { showWT = false }, { d -> viewModel.sendVoiceNote(d) })
             if (showCreateGrp) CreateGroupDialog({ showCreateGrp = false }, { n, m -> viewModel.createGroupChannel(n, m) })
             if (showSecurity && selectedContact != null) SecurityDetailsSheet(selectedContact, { viewModel.toggleSecurityPanel() }, { viewModel.toggleContactVerification(it) })
